@@ -1,7 +1,6 @@
 import React, {
   FC,
   useLayoutEffect,
-  useMemo,
   useState
 } from 'react';
 import useChat from './Hooks/useChat';

@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState } from 'react';
+import React, { FC, useState } from 'react';
 import SourceMDEditor from '@uiw/react-md-editor';
 import styled, { css } from 'styled-components';
 import { Button } from '@blueprintjs/core';
