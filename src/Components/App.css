@@ -1,0 +1,12 @@
+/* AsideMainExample.css */
+@media (min-width: 640px) {
+  .sm\:block {
+    display: block;
+  }
+  .sm\:ml-64 {
+    margin-left: 16rem;
+  }
+  .sm\:hidden {
+    display: none;
+  }
+}
