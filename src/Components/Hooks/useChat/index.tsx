@@ -136,7 +136,7 @@ const updateLastMessageInChat = ({
       const chatEntry = this.result;
 
       if (chatEntry) {
-        chatEntry.messages[chatEntry.messages.length - 1].content += newContent;
+        chatEntry.messages[chatEntry.messages.length - 1].content = newContent;
         const requestUpdate = objectStore.put(chatEntry, chatId);
         requestUpdate.onerror = function (event) {
           console.error("Error updating chat:", event);
@@ -349,47 +349,66 @@ const useChat = () => {
     return message.content;
   }, [openai])
 
-  const chatInternal = useCallback(async function* (
+  const chatInternal = useCallback(async (
     prompt: string,
     previousChats: IpreviousChats[],
-  ) {
-    let response;
-    try {
-      response = await openai.createChatCompletion({
-        model: currentChatModelRef.current,
-        messages: [
-          ...previousChats,
-          {
-            role: "user",
-            content: prompt,
-          }],
-        temperature: 0.5,
-        frequency_penalty: 0,
-        presence_penalty: 0,
-        stream: true,
-      }, { responseType: "stream" })
-    } catch (error) {
-      alert("Error getting chat: check your openai key is set correctly");
-      throw error;
-    }
-    let chunk = '';
-    // @ts-ignore
-    for (const char of response.data) {
-      if (char) {
-        chunk += char;
-        const mightBeData = chunk.replace(/data: /, '').trim();
-        try {
-          const data = JSON.parse(mightBeData)
-          if(data.choices[0].delta.content !== undefined) {
-            yield data.choices[0].delta.content;
-          }
-          chunk = '';
-        } catch (e) {
-          // do nothing
+    updateAllLastMessages: (newMessage: string) => void,
+  ) => {
+    const apiKey = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+    const url = "https://api.openai.com/v1/chat/completions";
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("Authorization", "Bearer " + apiKey);
+
+    xhr.onprogress = function(event) {
+      console.log("Received " + event.loaded + " bytes of data.");
+      console.log("Data: " + xhr.responseText);
+      const newUpdates = xhr.responseText
+      .replace("data: [DONE]", "")
+      .trim()
+      .split('data: ')
+      .filter(Boolean)
+
+      
+      const newUpdatesParsed = newUpdates.map((update) => {
+        const parsed = JSON.parse(update);
+        return parsed.choices[0].delta?.content || '';
+      }
+      );
+
+      const newUpdatesJoined = newUpdatesParsed.join('')
+      updateAllLastMessages(newUpdatesJoined);
+    };
+
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4) {
+        if (xhr.status === 200) {
+          console.log("Response complete.");
+          console.log("Final data: " + xhr.responseText);
+        } else {
+          console.error("Request failed with status " + xhr.status);
         }
       }
-    }
-  }, [openai]);
+    };
+
+    const data = JSON.stringify({
+      model: currentChatModelRef.current,
+      messages: [
+        ...previousChats,
+        {
+          role: "user",
+          content: prompt,
+        }],
+      temperature: 0.5,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      stream: true,
+    });
+
+    xhr.send(data);
+  }, []);
 
   const chat = async (prompt: string, previousChats: IpreviousChats[]) => {
     if (!prompt) return;
@@ -423,7 +442,7 @@ const useChat = () => {
         const chatId = uuidv5(currentChatTitle, UUID_NAMESPACE);
         const chat = prev[chatId];
         const lastMessage = chat.messages[chat.messages.length - 1];
-        lastMessage.content += content;
+        lastMessage.content = content;
         return {
           ...prev,
           [chatId]: {
@@ -444,9 +463,7 @@ const useChat = () => {
       updateLastMessageInChat({ newContent, currentChatTitle })
     }
 
-    for await (const part of chatInternal(prompt, previousChats)) {
-      updateAllLastMessage(part);
-    }
+    chatInternal(prompt, previousChats, updateAllLastMessage)
 
     setCurrentChat(currentChatTitle);
   }
