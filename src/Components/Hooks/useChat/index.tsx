@@ -91,7 +91,7 @@ const createOrUpdateChat = ({
           console.error("Error updating chat:", event);
         };
         requestUpdate.onsuccess = function (event) {
-          console.log("Chat updated:", event);
+          // console.log("Chat updated:", event);
         };
       } else {
         const requestAdd = objectStore.put({ title, messages: [message], model }, chatId);
@@ -101,6 +101,49 @@ const createOrUpdateChat = ({
         requestAdd.onsuccess = function (event) {
           console.log("Chat added:", event);
         }
+      }
+    };
+  };
+};
+
+interface updateLastMessageInChatArgs {
+  newContent: string,
+  currentChatTitle: string
+}
+
+const updateLastMessageInChat = ({
+  newContent,
+  currentChatTitle
+}: updateLastMessageInChatArgs) => {
+  const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+  request.onerror = function () {
+    console.error("Error opening database:", this.error);
+  };
+
+  request.onsuccess = function () {
+    const db = this.result;
+    const transaction = db.transaction(OBJECT_STORE_NAME, "readwrite");
+    const objectStore = transaction.objectStore(OBJECT_STORE_NAME);
+    const chatId = uuidv5(currentChatTitle, UUID_NAMESPACE);
+    const keyInStore = objectStore.get(chatId) as IDBRequest<ChatEntry | undefined>;
+
+    keyInStore.onerror = function (event) {
+      console.error("Error getting chat:", event);
+    };
+
+    keyInStore.onsuccess = function (event) {
+      const chatEntry = this.result;
+
+      if (chatEntry) {
+        chatEntry.messages[chatEntry.messages.length - 1].content += newContent;
+        const requestUpdate = objectStore.put(chatEntry, chatId);
+        requestUpdate.onerror = function (event) {
+          console.error("Error updating chat:", event);
+        };
+        requestUpdate.onsuccess = function (event) {
+          // console.log("Chat updated:", event);
+        };
       }
     };
   };
@@ -247,7 +290,7 @@ const useChat = () => {
   }, [allChats, setCurrentChat])
 
 
-  const updateLocalChat = ({
+  const addLocalChat = ({
     title,
     message,
     model
@@ -274,6 +317,7 @@ const useChat = () => {
       }));
     }
   };
+
 
   const summarizeChat = useCallback(async (textToSummarize: string) => {
     let response;
@@ -305,11 +349,13 @@ const useChat = () => {
     return message.content;
   }, [openai])
 
-  const chatInternal = useCallback(async (prompt: string, previousChats: IpreviousChats[]) => {
-    let newChat;
+  const chatInternal = useCallback(async function* (
+    prompt: string,
+    previousChats: IpreviousChats[],
+  ) {
+    let response;
     try {
-      newChat = await openai.createChatCompletion({
-        // model: "gpt-4",
+      response = await openai.createChatCompletion({
         model: currentChatModelRef.current,
         messages: [
           ...previousChats,
@@ -320,13 +366,29 @@ const useChat = () => {
         temperature: 0.5,
         frequency_penalty: 0,
         presence_penalty: 0,
-      })
+        stream: true,
+      }, { responseType: "stream" })
     } catch (error) {
       alert("Error getting chat: check your openai key is set correctly");
       throw error;
     }
-
-    return newChat;
+    let chunk = '';
+    // @ts-ignore
+    for (const char of response.data) {
+      if (char) {
+        chunk += char;
+        const mightBeData = chunk.replace(/data: /, '').trim();
+        try {
+          const data = JSON.parse(mightBeData)
+          if(data.choices[0].delta.content !== undefined) {
+            yield data.choices[0].delta.content;
+          }
+          chunk = '';
+        } catch (e) {
+          // do nothing
+        }
+      }
+    }
   }, [openai]);
 
   const chat = async (prompt: string, previousChats: IpreviousChats[]) => {
@@ -338,7 +400,7 @@ const useChat = () => {
       currentChatTitleRef.current = currentChatTitle;
     }
 
-    updateLocalChat({
+    addLocalChat({
       title: currentChatTitle,
       model: currentChatModelRef.current,
       message: {
@@ -347,20 +409,44 @@ const useChat = () => {
       }
     });
 
-    const response = await chatInternal(prompt, previousChats);
-    const [firstChoice] = response.data.choices;
-    const { message } = firstChoice;
-
-    if (!message) throw new Error("No message returned from OpenAI");
-
-    updateLocalChat({
+    addLocalChat({
       title: currentChatTitle,
       model: currentChatModelRef.current,
       message: {
         role: "assistant",
-        content: message.content,
+        content: '',
       }
     });
+
+    const updateLastMessageContent = (content: string) => {
+      setAllChats((prev) => {
+        const chatId = uuidv5(currentChatTitle, UUID_NAMESPACE);
+        const chat = prev[chatId];
+        const lastMessage = chat.messages[chat.messages.length - 1];
+        lastMessage.content += content;
+        return {
+          ...prev,
+          [chatId]: {
+            ...chat,
+            messages: [
+              ...chat.messages.slice(0, chat.messages.length - 1),
+              lastMessage
+            ]
+          }
+        }
+      });
+
+    }
+
+    const updateAllLastMessage = (newContent: string) => {
+      console.debug('newContent', newContent);
+      updateLastMessageContent(newContent);
+      updateLastMessageInChat({ newContent, currentChatTitle })
+    }
+
+    for await (const part of chatInternal(prompt, previousChats)) {
+      updateAllLastMessage(part);
+    }
 
     setCurrentChat(currentChatTitle);
   }
@@ -378,4 +464,4 @@ const useChat = () => {
   };
 }
 
-export default useChat; 
+export default useChat;
