@@ -29,7 +29,7 @@ const Aside: FC<AsideProps> = ({
 
   const asideWidth = isDesktop ? 'w-2/12' : 'w-full fixed';
 
-  const [openaiKey, setOpenaiKey] = useState(window.localStorage.getItem('openaiKey') || '');
+  const [openaiKey, setOpenaiKey] = useState(window.localStorage.getItem(LOCAL_STORAGE_KEY) || '');
 
   const [saveButtonIcon, setSaveButtonIcon] = useState<'floppy-disk' | 'tick'>('floppy-disk');
 
