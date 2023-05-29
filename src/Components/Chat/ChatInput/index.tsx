@@ -90,8 +90,8 @@ const ChatInput: FC<ChatInputProps> = ({
         value={message}
         onChange={(value) => setMessage(value || '')}
         onKeyDown={(e) => {
-          // check for ctrl/cmd + enter
-          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          // check for enter without ctrl/cmd
+          if (!e.ctrlKey && !e.metaKey && e.key === 'Enter') {
             sendMessage(message);
           }
         }}
