@@ -16,7 +16,9 @@ const App: FC = () => {
     chatTitle,
     currentChatModel,
     setCurrentChatModel,
-    availableModels
+    availableModels,
+    deleteChat,
+    deleteAllChats
   } = useChat();
 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -46,6 +48,8 @@ const App: FC = () => {
         isAsideVisible={isAsideVisible}
         isDesktop={isDesktop}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
+        deleteChat={deleteChat}
+        deleteAllChats={deleteAllChats}
       />
       <Main
         availableModels={availableModels}

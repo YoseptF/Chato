@@ -1,8 +1,16 @@
 import React, { FC, useState } from "react";
-import { ControlGroup, InputGroup, ButtonGroup, Label } from "@blueprintjs/core";
+import {
+  ControlGroup,
+  InputGroup,
+  ButtonGroup,
+  Label,
+
+} from "@blueprintjs/core";
 import Button from "../Button";
 import { LocalChat } from "../Hooks/useChat";
 import { LOCAL_STORAGE_KEY } from "../Utils/contants";
+import ButtonWithAction from "./ButtonWithAction";
+import ButtonWithPopover from "./ButtonWithPopover";
 
 interface AsideProps {
   allChats: LocalChat,
@@ -10,6 +18,8 @@ interface AsideProps {
   isAsideVisible: boolean,
   isDesktop: boolean,
   setIsMobileMenuOpen: (isOpen: boolean) => void,
+  deleteChat: (chatTitle: string) => void,
+  deleteAllChats: () => void,
 }
 
 const Aside: FC<AsideProps> = ({
@@ -18,6 +28,8 @@ const Aside: FC<AsideProps> = ({
   isAsideVisible,
   isDesktop,
   setIsMobileMenuOpen,
+  deleteChat,
+  deleteAllChats,
 }) => {
 
   const setCurrentChatAndCloseMenu = (chatTitle: string) => {
@@ -42,43 +54,45 @@ const Aside: FC<AsideProps> = ({
         style={{ zIndex: 101 }}
       >
         <ButtonGroup vertical minimal className='flex items-center justify-center'>
+          <ButtonWithAction
+            showAction={!isDesktop}
+            buttonIcon="plus"
+            actionIcon="cross"
+            onButtonClick={() => setCurrentChatAndCloseMenu("")}
+            onActionClick={() => setIsMobileMenuOpen(false)}
+            buttonText="New chat"
+          />
           <div
-            className="grid grid-flow-col"
-            style={{ gridTemplateColumns: '1fr 60px' }}
+            style={{
+              height: 'calc(100vh - 120px)',
+              gridAutoRows: 'max-content',
+              overflowY: 'auto',
+              position: 'relative',
+            }}
+            className="grid grid-flow-row"
           >
-            <Button
-              icon="plus"
-              type='button'
-              large
-              outlined
-              onClick={() => setCurrentChatAndCloseMenu("")}
-              text="New chat"
-            />
             {
-              !isDesktop && (
-                <Button
-                  icon="cross"
-                  type='button'
-                  large
-                  outlined
-                  onClick={() => setIsMobileMenuOpen(false)}
+              allChats && Object.entries(allChats).map(([id, chatEntry]) => (
+                <ButtonWithPopover
+                  key={id}
+                  id={id}
+                  title={chatEntry.title}
+                  deleteChat={deleteChat}
+                  setCurrentChatAndCloseMenu={setCurrentChatAndCloseMenu}
                 />
-              )
+              ))
             }
           </div>
-          {
-            allChats && Object.entries(allChats).map(([id, chatEntry]) => (
-              <Button
-                key={id}
-                type='button'
-                large
-                outlined
-                onClick={() => setCurrentChatAndCloseMenu(chatEntry.title)}
-              >
-                {chatEntry.title}
-              </Button>
-            ))
-          }
+          <ButtonWithAction
+            showAction={false}
+            buttonIcon="trash"
+            onButtonClick={() => {
+              deleteAllChats();
+              setIsMobileMenuOpen(false);
+              setCurrentChatAndCloseMenu('');
+            }}
+            buttonText="Delete all chats"
+          />
         </ButtonGroup>
         {
           showSettings && (

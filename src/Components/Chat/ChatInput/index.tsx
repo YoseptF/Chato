@@ -63,7 +63,8 @@ const ChatInput: FC<ChatInputProps> = ({
 
   const sendMessage = (m: string) => {
     if(!localStorageValue) {
-      alert('Please set your API key in the settings page');
+      alert(`Please set your API key in the settings page
+      (cog icon in the bottom left, you can get it here https://platform.openai.com/account/api-keys)`);
       return;
     }
     if (!m) return;

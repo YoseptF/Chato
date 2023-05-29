@@ -468,6 +468,62 @@ const useChat = () => {
     setCurrentChat(currentChatTitle);
   }
 
+  const deleteChat = (title: string) => {
+    const chatId = uuidv5(title, UUID_NAMESPACE);
+
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = function () {
+      console.error("Error opening database:", this.error);
+    };
+
+    request.onsuccess = function () {
+      const db = this.result;
+      const transaction = db.transaction(OBJECT_STORE_NAME, "readwrite");
+      const objectStore = transaction.objectStore(OBJECT_STORE_NAME);
+      const requestDelete = objectStore.delete(chatId);
+
+      requestDelete.onerror = function (event) {
+        console.error("Error deleting chat:", event);
+      };
+
+      requestDelete.onsuccess = function (event) {
+        console.log("Chat deleted:", event);
+      };
+
+      setAllChats((prev) => {
+        const newChats = { ...prev };
+        delete newChats[chatId];
+        return newChats;
+      }
+      );
+    };
+  };
+
+  const deleteAllChats = () => {
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = function () {
+      console.error("Error opening database:", this.error);
+    };
+
+    request.onsuccess = function () {
+      const db = this.result;
+      const transaction = db.transaction(OBJECT_STORE_NAME, "readwrite");
+      const objectStore = transaction.objectStore(OBJECT_STORE_NAME);
+      const requestDelete = objectStore.clear();
+
+      requestDelete.onerror = function (event) {
+        console.error("Error deleting chats:", event);
+      };
+
+      requestDelete.onsuccess = function (event) {
+        console.log("Chats deleted:", event);
+      };
+
+      setAllChats({});
+    };
+  };
 
   return {
     chat,
@@ -478,6 +534,8 @@ const useChat = () => {
     currentChatModel,
     setCurrentChatModel,
     availableModels: Object.values(AvailableModel),
+    deleteChat,
+    deleteAllChats
   };
 }
 
